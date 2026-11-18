@@ -66,8 +66,8 @@ class AssetServer:
         query = urllib.parse.urlencode({"t": self.token, "file": path})
         return f"{self.base}/proxy?{query}"
 
-    def viewer_url(self, src: str, name: str) -> str:
-        query = urllib.parse.urlencode({"src": src, "name": name})
+    def viewer_url(self, src: str, name: str, theme: str = "dark") -> str:
+        query = urllib.parse.urlencode({"src": src, "name": name, "theme": theme})
         return f"{self.base}/viewer?{query}"
 
     def home_url(self, params: dict[str, str]) -> str:

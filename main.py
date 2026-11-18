@@ -24,9 +24,7 @@ def main() -> int:
     app.setOrganizationName("FlashBrowser")
 
     from flashbrowser.server import AssetServer
-    from flashbrowser.window import MainWindow, apply_theme
-
-    apply_theme(app)
+    from flashbrowser.window import MainWindow
 
     server = AssetServer(ROOT / "assets")
     handle = QtCore.QFile(":/qtwebchannel/qwebchannel.js")

@@ -18,12 +18,23 @@ from PyQt5.QtWebEngineWidgets import (
 
 from . import ruffle
 from .page import BrowserPage
+from .search import (
+    DEFAULT_SEARCH_ENGINE,
+    SEARCH_ENGINES,
+    SEARCH_ORDER,
+    THEME_MODES,
+    build_search_url,
+    engine_label,
+    is_windows_path,
+    looks_like_url,
+    normalize_engine,
+)
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 CHROME_HEIGHT = 100
 FRAME_MARGIN = 6
 
-THEME = """
+DARK_THEME = """
 QMenu {
     background: #141c29;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -72,9 +83,58 @@ QPushButton:hover {
 }
 """
 
+LIGHT_THEME = """
+QMenu {
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 10px;
+    padding: 6px;
+    color: #1b2a44;
+}
+QMenu::item {
+    padding: 6px 26px 6px 24px;
+    border-radius: 6px;
+}
+QMenu::item:selected {
+    background: rgba(255, 106, 61, 0.16);
+    color: #0b1526;
+}
+QMenu::item:disabled {
+    color: #98a6ba;
+}
+QMenu::separator {
+    height: 1px;
+    background: rgba(15, 23, 42, 0.1);
+    margin: 5px 8px;
+}
+QToolTip {
+    background: #ffffff;
+    color: #1b2a44;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    padding: 5px 9px;
+}
+QMessageBox, QDialog {
+    background: #f6f8fc;
+    color: #1b2a44;
+}
+QMessageBox QLabel {
+    color: #1b2a44;
+}
+QPushButton {
+    background: #eef2f9;
+    color: #1b2a44;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 8px;
+    padding: 6px 18px;
+}
+QPushButton:hover {
+    background: #e2e8f4;
+}
+"""
 
-def apply_theme(app: QtWidgets.QApplication) -> None:
-    app.setStyleSheet(THEME)
+
+def apply_theme(app: QtWidgets.QApplication, dark: bool = True) -> None:
+    app.setStyleSheet(DARK_THEME if dark else LIGHT_THEME)
 
 
 def _build_app_icon() -> QtGui.QIcon:
@@ -111,17 +171,17 @@ def _icon_to_data_url(icon: QtGui.QIcon) -> str:
     return "data:image/png;base64," + base64.b64encode(bytes(data)).decode("ascii")
 
 
-def _style_native_window(hwnd: int) -> None:
+def _style_native_window(hwnd: int, dark: bool = True) -> None:
     if not sys.platform.startswith("win"):
         return
     try:
         import ctypes
 
         dwm = ctypes.windll.dwmapi
-        dark = ctypes.c_int(1)
+        value = ctypes.c_int(1 if dark else 0)
         for attribute in (20, 19):
             dwm.DwmSetWindowAttribute(
-                ctypes.c_void_p(hwnd), attribute, ctypes.byref(dark), ctypes.sizeof(dark)
+                ctypes.c_void_p(hwnd), attribute, ctypes.byref(value), ctypes.sizeof(value)
             )
         corner = ctypes.c_int(2)
         dwm.DwmSetWindowAttribute(
@@ -132,15 +192,20 @@ def _style_native_window(hwnd: int) -> None:
 
 
 class _Frame(QtWidgets.QWidget):
-    def __init__(self, window, margin: int = FRAME_MARGIN):
+    def __init__(self, window, margin: int = FRAME_MARGIN, background: str = "#070b11"):
         super().__init__(window)
         self.window = window
         self.margin = margin
+        self._background = QtGui.QColor(background)
         self.setMouseTracking(True)
+
+    def set_background(self, color: str):
+        self._background = QtGui.QColor(color)
+        self.update()
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        painter.fillRect(self.rect(), QtGui.QColor("#070b11"))
+        painter.fillRect(self.rect(), self._background)
         painter.end()
 
     def _edges(self, pos):
@@ -268,6 +333,10 @@ class ChromeBridge(QtCore.QObject):
         self.window._show_app_menu()
 
     @QtCore.pyqtSlot()
+    def toggle_theme(self):
+        self.window._toggle_theme()
+
+    @QtCore.pyqtSlot()
     def toggle_ruffle(self):
         self.window.act_ruffle.setChecked(not self.window.act_ruffle.isChecked())
 
@@ -301,6 +370,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self._state_timer.setSingleShot(True)
         self._state_timer.timeout.connect(self._emit_state)
 
+        self.settings = QtCore.QSettings("FlashBrowser", "FlashBrowser")
+        theme_mode = str(self.settings.value("theme", "system"))
+        self.theme_mode = theme_mode if theme_mode in THEME_MODES else "system"
+        self.search_engine = normalize_engine(
+            str(self.settings.value("searchEngine", DEFAULT_SEARCH_ENGINE))
+        )
+        self.theme_dark = self._effective_dark()
+        app = QtWidgets.QApplication.instance()
+        apply_theme(app, self.theme_dark)
+        if app is not None:
+            app.paletteChanged.connect(self._on_palette_changed)
+
         self.setWindowTitle("Flash Browser")
         self.setWindowIcon(_build_app_icon())
         self.setWindowFlags(
@@ -329,6 +410,113 @@ class MainWindow(QtWidgets.QMainWindow):
             rect.center().x() - width // 2,
             rect.center().y() - height // 2,
         )
+
+    def _system_is_dark(self) -> bool:
+        if sys.platform.startswith("win"):
+            try:
+                import winreg
+
+                with winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                ) as key:
+                    value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                    return int(value) == 0
+            except OSError:
+                pass
+        palette = QtWidgets.QApplication.palette()
+        return palette.color(QtGui.QPalette.Window).lightness() < 128
+
+    def _effective_dark(self) -> bool:
+        if self.theme_mode == "dark":
+            return True
+        if self.theme_mode == "light":
+            return False
+        return self._system_is_dark()
+
+    def _theme_value(self) -> str:
+        return "dark" if self.theme_dark else "light"
+
+    def _frame_color(self) -> str:
+        return "#070b11" if self.theme_dark else "#e3e9f4"
+
+    def _chrome_background(self) -> str:
+        return "#0b111a" if self.theme_dark else "#eef2f9"
+
+    def _toggle_theme(self):
+        self._set_theme_mode("light" if self.theme_dark else "dark")
+
+    def _set_theme_mode(self, mode: str):
+        if mode not in THEME_MODES:
+            mode = "system"
+        self.theme_mode = mode
+        self.settings.setValue("theme", mode)
+        self._apply_theme_visuals()
+
+    def _apply_theme_visuals(self):
+        self.theme_dark = self._effective_dark()
+        app = QtWidgets.QApplication.instance()
+        apply_theme(app, self.theme_dark)
+        if hasattr(self, "frame"):
+            self.frame.set_background(self._frame_color())
+        if hasattr(self, "chrome_page"):
+            self.chrome_page.setBackgroundColor(
+                QtGui.QColor(self._chrome_background())
+            )
+        if self._native_style_applied:
+            _style_native_window(int(self.winId()), self.theme_dark)
+        self._update_theme_actions()
+        if hasattr(self, "stack"):
+            for index in range(self.stack.count()):
+                self._apply_local_preferences(self.stack.widget(index))
+        self._push_state()
+
+    def _on_palette_changed(self):
+        if self.theme_mode == "system":
+            QtCore.QTimer.singleShot(0, self._sync_system_theme)
+
+    def _sync_system_theme(self):
+        if self.theme_mode != "system":
+            return
+        if self._system_is_dark() != self.theme_dark:
+            self._apply_theme_visuals()
+
+    def _update_theme_actions(self):
+        for mode, action in getattr(self, "theme_actions", {}).items():
+            action.blockSignals(True)
+            action.setChecked(mode == self.theme_mode)
+            action.blockSignals(False)
+
+    def _set_search_engine(self, key: str):
+        key = normalize_engine(key)
+        if key == self.search_engine:
+            return
+        self.search_engine = key
+        self.settings.setValue("searchEngine", key)
+        self._update_engine_actions()
+        if hasattr(self, "stack"):
+            for index in range(self.stack.count()):
+                self._apply_local_preferences(self.stack.widget(index))
+        self._push_state()
+
+    def _update_engine_actions(self):
+        for key, action in getattr(self, "engine_actions", {}).items():
+            action.blockSignals(True)
+            action.setChecked(key == self.search_engine)
+            action.blockSignals(False)
+
+    def _apply_local_preferences(self, view):
+        if view is None:
+            return
+        if not view.url().toString().startswith(self.server.base):
+            return
+        theme = json.dumps(self._theme_value())
+        engine = json.dumps(self.search_engine)
+        script = (
+            "if (window.__setTheme) { window.__setTheme(%s); }"
+            "if (window.__setEngine) { window.__setEngine(%s); }" % (theme, engine)
+        )
+        view.page().runJavaScript(script)
 
     def _setup_profile(self):
         base = Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation))
@@ -419,8 +607,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self.act_focus.triggered.connect(self._focus_address)
         self.addAction(self.act_focus)
 
+        self.engine_group = QtWidgets.QActionGroup(self)
+        self.engine_group.setExclusive(True)
+        self.engine_actions = {}
+        for key in SEARCH_ORDER:
+            action = QtWidgets.QAction(SEARCH_ENGINES[key]["label"], self)
+            action.setCheckable(True)
+            action.setChecked(key == self.search_engine)
+            action.triggered.connect(
+                lambda checked, k=key: checked and self._set_search_engine(k)
+            )
+            self.engine_group.addAction(action)
+            self.engine_actions[key] = action
+
+        self.theme_group = QtWidgets.QActionGroup(self)
+        self.theme_group.setExclusive(True)
+        self.theme_actions = {}
+        theme_labels = {"system": "跟随系统", "light": "浅色", "dark": "深色"}
+        for mode in THEME_MODES:
+            action = QtWidgets.QAction(theme_labels[mode], self)
+            action.setCheckable(True)
+            action.setChecked(mode == self.theme_mode)
+            action.triggered.connect(
+                lambda checked, m=mode: checked and self._set_theme_mode(m)
+            )
+            self.theme_group.addAction(action)
+            self.theme_actions[mode] = action
+
     def _setup_ui(self):
-        self.frame = _Frame(self)
+        self.frame = _Frame(self, background=self._frame_color())
         layout = QtWidgets.QVBoxLayout(self.frame)
         layout.setContentsMargins(FRAME_MARGIN, FRAME_MARGIN, FRAME_MARGIN, FRAME_MARGIN)
         layout.setSpacing(0)
@@ -429,7 +644,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.chrome_view.setFixedHeight(CHROME_HEIGHT)
         self.chrome_view.setContextMenuPolicy(Qt.NoContextMenu)
         self.chrome_page = ChromePage(self.profile, self, self.server.base)
-        self.chrome_page.setBackgroundColor(QtGui.QColor("#0b111a"))
+        self.chrome_page.setBackgroundColor(QtGui.QColor(self._chrome_background()))
         self.chrome_view.setPage(self.chrome_page)
         self.chrome_view.loadFinished.connect(self._on_chrome_loaded)
 
@@ -445,7 +660,9 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self.stack, 1)
         self.setCentralWidget(self.frame)
 
-        self.chrome_view.setUrl(QUrl(self.server.base + "/chrome"))
+        self.chrome_view.setUrl(
+            QUrl(self.server.base + "/chrome?theme=" + self._theme_value())
+        )
 
     def _on_chrome_loaded(self, ok):
         if ok:
@@ -459,6 +676,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "source": self.flash.source,
             "hint": self.flash.hint,
             "ruffle": "1" if self.use_ruffle else "0",
+            "theme": self._theme_value(),
+            "engine": self.search_engine,
+            "engineLabel": engine_label(self.search_engine),
         }
         return self.server.home_url(params)
 
@@ -545,6 +765,7 @@ class MainWindow(QtWidgets.QMainWindow):
         view.setProperty("_loading", False)
         if view is self.current_view():
             self._update_nav_actions(view)
+        self._apply_local_preferences(view)
         self._push_state()
 
     def select_tab(self, index: int):
@@ -555,13 +776,17 @@ class MainWindow(QtWidgets.QMainWindow):
         text = (text or "").strip()
         if not text:
             return
-        view = self.current_view()
-        if view is None:
-            view = self.add_tab()
+        view = self.current_view() or self.add_tab()
         if text.lower().startswith("flashbrowser://"):
             view.setUrl(QUrl(self._home_url()))
             return
-        view.setUrl(QUrl.fromUserInput(text))
+        if is_windows_path(text):
+            view.setUrl(QUrl.fromLocalFile(text))
+            return
+        if looks_like_url(text):
+            view.setUrl(QUrl.fromUserInput(text))
+            return
+        view.setUrl(QUrl(build_search_url(text, self.search_engine)))
 
     def _push_state(self):
         if not self._state_timer.isActive():
@@ -612,6 +837,10 @@ class MainWindow(QtWidgets.QMainWindow):
             "statusText": status_text,
             "statusTitle": status_title,
             "ruffle": self.use_ruffle,
+            "theme": self._theme_value(),
+            "themeMode": self.theme_mode,
+            "searchEngine": self.search_engine,
+            "searchLabel": engine_label(self.search_engine),
         }
         self.bridge.stateChanged.emit(json.dumps(state, ensure_ascii=False))
 
@@ -670,7 +899,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             src = self.server.proxy_url_for_remote(target.toString())
             name = Path(target.path()).name or "flash.swf"
-        view.setUrl(QUrl(self.server.viewer_url(src, name)))
+        view.setUrl(QUrl(self.server.viewer_url(src, name, self._theme_value())))
 
     def _toggle_ruffle(self, enabled):
         self.use_ruffle = bool(enabled)
@@ -697,6 +926,14 @@ class MainWindow(QtWidgets.QMainWindow):
             menu = QtWidgets.QMenu(self)
             menu.addAction(self.act_new_tab)
             menu.addAction(self.act_open)
+            menu.addSeparator()
+
+            engines_menu = menu.addMenu("搜索引擎")
+            engines_menu.addActions(list(self.engine_actions.values()))
+
+            appearance_menu = menu.addMenu("外观")
+            appearance_menu.addActions(list(self.theme_actions.values()))
+
             menu.addSeparator()
             menu.addAction(self.act_ruffle)
             menu.addAction(self.act_flash_dir)
@@ -785,13 +1022,18 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self._native_style_applied:
             self._native_style_applied = True
             QtCore.QTimer.singleShot(
-                0, lambda: _style_native_window(int(self.winId()))
+                0,
+                lambda: _style_native_window(int(self.winId()), self.theme_dark),
             )
+        else:
+            _style_native_window(int(self.winId()), self.theme_dark)
 
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() == QtCore.QEvent.WindowStateChange:
             self._push_state()
+        elif event.type() == QtCore.QEvent.WindowActivate:
+            self._sync_system_theme()
 
     def closeEvent(self, event):
         super().closeEvent(event)

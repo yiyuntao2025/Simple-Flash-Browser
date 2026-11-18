@@ -5,6 +5,10 @@
     '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.7" y="2.7" width="10.6" height="10.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
   var ICON_RESTORE =
     '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.6" y="4.6" width="8.8" height="8.8" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.2 4.6V3.4A1.4 1.4 0 0 1 6.6 2h6A1.4 1.4 0 0 1 14 3.4v6a1.4 1.4 0 0 1-1.4 1.4h-1.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
+  var ICON_SUN =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  var ICON_MOON =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.2A8.6 8.6 0 0 1 8.8 3.5 8.6 8.6 0 1 0 20.5 15.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
 
   var bridge = null;
   var state = null;
@@ -130,6 +134,14 @@
       dom.address.value = next.url || "";
     }
 
+    var light = next.theme === "light";
+    document.documentElement.dataset.theme = light ? "light" : "dark";
+    dom.theme.innerHTML = light ? ICON_MOON : ICON_SUN;
+    dom.theme.title = light ? "切换到深色模式" : "切换到浅色模式";
+
+    var engine = next.searchLabel || "Bing";
+    dom.address.placeholder = "在 " + engine + " 搜索，或输入网址";
+
     dom.back.disabled = !next.canBack;
     dom.forward.disabled = !next.canForward;
     document.body.classList.toggle("loading", Boolean(next.loading));
@@ -196,6 +208,9 @@
     });
     dom.menu.addEventListener("click", function () {
       call("show_menu");
+    });
+    dom.theme.addEventListener("click", function () {
+      call("toggle_theme");
     });
 
     dom.min.addEventListener("click", function () {
@@ -280,6 +295,7 @@
     dom.statusText = $("status-text");
     dom.openfile = $("openfile");
     dom.menu = $("menu");
+    dom.theme = $("theme-toggle");
     dom.min = $("win-min");
     dom.max = $("win-max");
     dom.close = $("win-close");

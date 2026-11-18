@@ -1,16 +1,68 @@
 :root {
-  --bg-deep: #080c13;
+  --app-bg: radial-gradient(900px 200px at 8% -130px, rgba(255, 106, 61, 0.2), transparent 70%),
+    radial-gradient(820px 210px at 92% -150px, rgba(86, 134, 255, 0.22), transparent 70%),
+    linear-gradient(180deg, #121b2a 0%, #0d1420 62%, #0b111a 100%);
   --text: #e9f0fb;
+  --text-strong: #ffffff;
   --text-dim: #a2b2c9;
   --text-muted: #6f8099;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
+  --hover: rgba(255, 255, 255, 0.08);
+  --hover-soft: rgba(255, 255, 255, 0.06);
+  --tab-bg: rgba(255, 255, 255, 0.028);
+  --tab-active-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.045));
+  --tab-active-border: rgba(255, 255, 255, 0.12);
+  --tab-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  --input-bg: rgba(5, 9, 15, 0.62);
+  --input-bg-focus: rgba(6, 10, 17, 0.92);
+  --input-inset: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --title-border: rgba(255, 255, 255, 0.05);
+  --pill-bg: rgba(255, 255, 255, 0.035);
+  --icon: #a9b8cf;
+  --site-icon: #7f93ae;
+  --placeholder: #64748b;
   --accent: #ff6a3d;
   --accent-2: #ff2d6f;
   --accent-soft: rgba(255, 106, 61, 0.16);
+  --accent-ink: #ffb59c;
   --ok: #3ddc97;
   --warn: #fbbf24;
   --danger: #ff6b6b;
+  --close-hover-bg: rgba(255, 80, 90, 0.22);
+  --close-hover-fg: #ffb3b3;
+}
+
+html[data-theme="light"] {
+  --app-bg: radial-gradient(900px 200px at 8% -130px, rgba(255, 138, 61, 0.22), transparent 70%),
+    radial-gradient(820px 210px at 92% -150px, rgba(86, 134, 255, 0.2), transparent 70%),
+    linear-gradient(180deg, #fafcff 0%, #f1f5fb 62%, #e9eef7 100%);
+  --text: #16233b;
+  --text-strong: #0b1526;
+  --text-dim: #52617a;
+  --text-muted: #7b8aa3;
+  --border: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.2);
+  --hover: rgba(15, 23, 42, 0.07);
+  --hover-soft: rgba(15, 23, 42, 0.045);
+  --tab-bg: rgba(255, 255, 255, 0.55);
+  --tab-active-bg: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.72));
+  --tab-active-border: rgba(15, 23, 42, 0.12);
+  --tab-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  --input-bg: rgba(255, 255, 255, 0.72);
+  --input-bg-focus: #ffffff;
+  --input-inset: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --title-border: rgba(15, 23, 42, 0.08);
+  --pill-bg: rgba(255, 255, 255, 0.62);
+  --icon: #4a586f;
+  --site-icon: #64748b;
+  --placeholder: #94a3b8;
+  --accent-ink: #c2410c;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --close-hover-bg: rgba(220, 38, 38, 0.12);
+  --close-hover-fg: #b91c1c;
 }
 
 * {
@@ -25,7 +77,7 @@ body {
 
 body {
   overflow: hidden;
-  background: var(--bg-deep);
+  background: var(--app-bg);
   color: var(--text);
   font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
     "Microsoft YaHei", system-ui, sans-serif;
@@ -45,9 +97,7 @@ input {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: radial-gradient(900px 200px at 8% -130px, rgba(255, 106, 61, 0.2), transparent 70%),
-    radial-gradient(820px 210px at 92% -150px, rgba(86, 134, 255, 0.22), transparent 70%),
-    linear-gradient(180deg, #121b2a 0%, #0d1420 62%, #0b111a 100%);
+  background: var(--app-bg);
 }
 
 .titlebar {
@@ -57,7 +107,7 @@ input {
   gap: 6px;
   height: 46px;
   padding: 0 8px 0 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--title-border);
 }
 
 .brand {
@@ -106,22 +156,22 @@ input {
   padding: 0 6px 0 9px;
   border: 1px solid transparent;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.028);
+  background: var(--tab-bg);
   color: var(--text-dim);
   transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease,
     box-shadow 0.16s ease;
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #d8e3f4;
+  background: var(--hover-soft);
+  color: var(--text);
 }
 
 .tab.active {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.045));
-  color: #f5f9ff;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  border-color: var(--tab-active-border);
+  background: var(--tab-active-bg);
+  color: var(--text-strong);
+  box-shadow: var(--tab-shadow);
 }
 
 .tab.active::after {
@@ -192,8 +242,8 @@ input {
 }
 
 .tab .close:hover {
-  background: rgba(255, 80, 90, 0.22);
-  color: #ffb3b3;
+  background: var(--close-hover-bg);
+  color: var(--close-hover-fg);
   opacity: 1;
 }
 
@@ -219,8 +269,8 @@ input {
 }
 
 .newtab:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #ffffff;
+  background: var(--hover);
+  color: var(--text-strong);
 }
 
 .newtab svg {
@@ -250,8 +300,8 @@ input {
 }
 
 .win-btn:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffffff;
+  background: var(--hover);
+  color: var(--text-strong);
 }
 
 .win-btn.close:hover {
@@ -271,7 +321,7 @@ input {
   gap: 8px;
   height: 54px;
   padding: 0 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--title-border);
 }
 
 .nav-group {
@@ -289,14 +339,14 @@ input {
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: #a9b8cf;
+  color: var(--icon);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, transform 0.05s ease;
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: var(--hover);
+  color: var(--text-strong);
 }
 
 .icon-btn:active {
@@ -305,7 +355,7 @@ input {
 
 .icon-btn:disabled {
   background: transparent;
-  color: #a9b8cf;
+  color: var(--icon);
   opacity: 0.32;
   cursor: default;
   transform: none;
@@ -326,14 +376,14 @@ input {
   padding: 0 6px 0 11px;
   border: 1px solid var(--border);
   border-radius: 11px;
-  background: rgba(5, 9, 15, 0.62);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: var(--input-bg);
+  box-shadow: var(--input-inset);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .omnibox:focus-within {
   border-color: rgba(255, 106, 61, 0.5);
-  background: rgba(6, 10, 17, 0.92);
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px rgba(255, 106, 61, 0.13);
 }
 
@@ -343,7 +393,7 @@ input {
   place-items: center;
   width: 16px;
   height: 16px;
-  color: #7f93ae;
+  color: var(--site-icon);
 }
 
 .site-icon svg {
@@ -364,7 +414,7 @@ input {
 }
 
 #address::placeholder {
-  color: #64748b;
+  color: var(--placeholder);
 }
 
 #go {
@@ -377,14 +427,14 @@ input {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #7f93ae;
+  color: var(--site-icon);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 #go:hover {
   background: var(--accent-soft);
-  color: #ffb59c;
+  color: var(--accent-ink);
 }
 
 #go svg {
@@ -401,7 +451,7 @@ input {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--pill-bg);
   color: var(--text-dim);
   font-size: 11.5px;
   white-space: nowrap;
