@@ -18,6 +18,7 @@ from PyQt5.QtWebEngineWidgets import (
 
 from . import ruffle
 from .page import BrowserPage
+from .paths import app_root
 from .search import (
     DEFAULT_SEARCH_ENGINE,
     SEARCH_ENGINES,
@@ -30,7 +31,7 @@ from .search import (
     normalize_engine,
 )
 
-APP_ROOT = Path(__file__).resolve().parent.parent
+APP_ROOT = app_root()
 CHROME_HEIGHT = 100
 FRAME_MARGIN = 6
 

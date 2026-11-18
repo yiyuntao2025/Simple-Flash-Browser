@@ -6,7 +6,9 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-APP_ROOT = Path(__file__).resolve().parent.parent
+from .paths import app_root
+
+APP_ROOT = app_root()
 DEFAULT_FLASH_VERSION = "32.0.0.465"
 
 _MACHINE_X86 = 0x014C
