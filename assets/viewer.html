@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Flash 播放器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff5a3c'/%3E%3Cpath d='M18 4 8 18h6l-2 10 12-16h-7l1-8Z' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: dark;
+    --border: rgba(255, 255, 255, 0.08);
+    --dim: #a2b2c9;
+    --accent: #ff6a3d;
+    --accent-2: #ff2d6f;
+  }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid #080c13;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(900px 300px at 50% -160px, rgba(255, 106, 61, 0.14), transparent 70%),
+      radial-gradient(800px 300px at 50% -180px, rgba(86, 134, 255, 0.16), transparent 70%),
+      #080c13;
+    color: #e9f0fb;
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI",
+      "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 46px;
+    padding: 0 12px 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(18, 27, 42, 0.92), rgba(13, 20, 32, 0.88));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    z-index: 2;
+  }
+  #bar .mark {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    color: #fff;
+    background: linear-gradient(135deg, #ff8a3d, #ff2d6f);
+    box-shadow: 0 5px 12px rgba(255, 70, 90, 0.35);
+  }
+  #bar .mark svg { width: 13px; height: 13px; }
+  #name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: #dbe6f7;
+    font-size: 13px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  #bar .tag {
+    flex: none;
+    padding: 3px 9px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #8fa3bf;
+    font-size: 11px;
+  }
+  #bar button {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #dbe6f7;
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.05s ease;
+  }
+  #bar button:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+  }
+  #bar button:active { transform: scale(0.96); }
+  #bar button svg { width: 14px; height: 14px; }
+  #stage {
+    position: relative;
+    flex: 1;
+    display: flex;
+  }
+  #player {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+  }
+  #player ruffle-player {
+    width: 100%;
+    height: 100%;
+  }
+  #status {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: radial-gradient(600px 320px at 50% 40%, rgba(30, 42, 62, 0.55), rgba(8, 12, 19, 0.9));
+    color: var(--dim);
+    font-size: 13.5px;
+    text-align: center;
+  }
+  #status.hidden { display: none; }
+  .spinner {
+    width: 38px;
+    height: 38px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--accent);
+    border-right-color: var(--accent-2);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  #status .message {
+    max-width: 560px;
+    padding: 0 24px;
+    line-height: 1.8;
+  }
+  #status.error .spinner { display: none; }
+  #status.error .message {
+    color: #f3a8a8;
+    padding: 16px 20px;
+    border: 1px solid rgba(255, 107, 107, 0.28);
+    border-radius: 12px;
+    background: rgba(255, 107, 107, 0.08);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="bar">
+  <div class="mark">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M13.2 2 5 14h5.6L9.6 22 19 9.6h-5.8L13.2 2Z" fill="currentColor"/>
+    </svg>
+  </div>
+  <span id="name">Flash 播放器</span>
+  <span class="tag">Ruffle</span>
+  <button id="fullscreen" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    全屏
+  </button>
+</div>
+<div id="stage">
+  <div id="player"></div>
+  <div id="status">
+    <div class="spinner"></div>
+    <div class="message" id="status-message">正在启动 Ruffle…</div>
+  </div>
+</div>
+
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  window.RufflePlayer.config = {
+    publicPath: "/ruffle/",
+    autoplay: "on",
+    unmuteOverlay: "hidden",
+    splashScreen: false,
+    contextMenu: "rightClick",
+    letterbox: "on",
+    scale: "showAll",
+    quality: "high",
+    logLevel: "warn",
+    openUrlMode: "allow",
+    allowFullscreen: true
+  };
+</script>
+<script src="/ruffle/ruffle.js"></script>
+<script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var src = params.get("src") || "";
+    var name = params.get("name") || src || "Flash 影片";
+
+    var status = document.getElementById("status");
+    var message = document.getElementById("status-message");
+    var player = null;
+
+    document.getElementById("name").textContent = name;
+    document.title = name;
+
+    function showError(text) {
+      status.classList.remove("hidden");
+      status.classList.add("error");
+      message.textContent = text;
+    }
+
+    function hideStatus() {
+      status.classList.add("hidden");
+    }
+
+    document.getElementById("fullscreen").addEventListener("click", function () {
+      var stage = document.getElementById("stage");
+      if (stage.requestFullscreen) {
+        stage.requestFullscreen();
+      }
+    });
+
+    if (!src) {
+      showError("没有指定 SWF 文件。");
+      return;
+    }
+
+    try {
+      player = window.RufflePlayer.newest().createPlayer();
+      player.style.width = "100%";
+      player.style.height = "100%";
+      document.getElementById("player").appendChild(player);
+      player.addEventListener("loadedmetadata", function () {
+        document.title = name;
+        hideStatus();
+      });
+      player.addEventListener("loadeddata", hideStatus);
+      player.load({ url: src, autoplay: "on", unmuteOverlay: "hidden" });
+      window.setTimeout(hideStatus, 8000);
+    } catch (error) {
+      showError("Ruffle 启动失败：" + error);
+    }
+  })();
+</script>
+</body>
+</html>
